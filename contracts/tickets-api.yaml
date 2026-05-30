@@ -1,0 +1,300 @@
+openapi: 3.0.3
+info:
+  title: Panini FIFA 2026 Support Tickets API
+  description: Internal support ticket management API for Panini's FIFA World Cup 2026 album distribution operations.
+  version: 1.0.0
+  contact:
+    name: Panini Mobile Team
+
+servers:
+  - url: https://api.panini-fifa2026.com/v1
+    description: Production server
+
+tags:
+  - name: auth
+    description: Authentication
+  - name: tickets
+    description: Support ticket management
+
+paths:
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Authenticate operator
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              username: admin
+              password: admin123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /tickets:
+    get:
+      tags: [tickets]
+      summary: List all support tickets
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of tickets sorted by priority
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ticket'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [tickets]
+      summary: Create a new support ticket
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTicketRequest'
+            example:
+              title: "Missing shipment to San Jose warehouse"
+              description: "Shipment #SH-2026-0501 has not arrived after 5 business days."
+              priority: HIGH
+              category: LOGISTICS
+              supplier: "LogiSticker Costa Rica"
+      responses:
+        '201':
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tickets/{id}:
+    get:
+      tags: [tickets]
+      summary: Get ticket by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TicketId'
+      responses:
+        '200':
+          description: Ticket detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tickets/{id}/status:
+    patch:
+      tags: [tickets]
+      summary: Update ticket status
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TicketId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStatusRequest'
+            example:
+              status: IN_PROGRESS
+      responses:
+        '200':
+          description: Status updated — returns full updated ticket
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tickets/{id}/priority:
+    patch:
+      tags: [tickets]
+      summary: Update ticket priority
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TicketId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePriorityRequest'
+            example:
+              priority: CRITICAL
+      responses:
+        '200':
+          description: Priority updated — returns full updated ticket
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    TicketId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        example: TKT-001
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT bearer token for subsequent requests
+        username:
+          type: string
+        role:
+          type: string
+          enum: [OPERATOR, ADMIN, VIEWER]
+
+    Ticket:
+      type: object
+      properties:
+        id:
+          type: string
+          example: TKT-001
+        title:
+          type: string
+          example: Critical stockout of Group A sticker packs
+        description:
+          type: string
+        priority:
+          type: string
+          enum: [CRITICAL, HIGH, MEDIUM, LOW]
+        status:
+          type: string
+          enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED]
+        category:
+          type: string
+          enum: [DISTRIBUTION, INVENTORY, SUPPLIER, LOGISTICS, PACKAGING]
+        supplier:
+          type: string
+          example: Distribuidora Centroamericana S.A.
+        created_at:
+          type: string
+          format: date
+          example: "2026-05-28"
+        reported_by:
+          type: string
+          example: Carlos Mendoza
+
+    CreateTicketRequest:
+      type: object
+      required: [title, priority, category, supplier]
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+        priority:
+          type: string
+          enum: [CRITICAL, HIGH, MEDIUM, LOW]
+        category:
+          type: string
+          enum: [DISTRIBUTION, INVENTORY, SUPPLIER, LOGISTICS, PACKAGING]
+        supplier:
+          type: string
+
+    UpdateStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED]
+
+    UpdatePriorityRequest:
+      type: object
+      required: [priority]
+      properties:
+        priority:
+          type: string
+          enum: [CRITICAL, HIGH, MEDIUM, LOW]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    BadRequest:
+      description: Invalid request body or parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
